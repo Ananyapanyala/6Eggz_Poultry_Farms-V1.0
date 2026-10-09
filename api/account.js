@@ -14,6 +14,6 @@ export default async function(req,res){
  const b=req.body||{},name=s(b.full_name,160),phone=s(b.phone,40);
  const current=await db.query("SELECT * FROM customer_profiles WHERE user_id=$1",[user.id]);
  const p=await db.query("INSERT INTO customer_profiles(user_id,full_name,phone) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET full_name=EXCLUDED.full_name,phone=EXCLUDED.phone,updated_at=NOW() RETURNING user_id,full_name,phone,updated_at",[user.id,name,phone]);
- await db.query("INSERT INTO admin_audit_log(actor,action,entity_type,entity_id,before_data,after_data,notes) VALUES($1,'customer_profile_updated','customer_profile',$2,$3::jsonb,$4::jsonb,'Customer updated their own profile')",[s(user.email||user.id,200),"customer_profile_update",user.id,JSON.stringify(current.rows[0]||{}),JSON.stringify(p.rows[0])]);
+ await db.query("INSERT INTO admin_audit_log(actor,action,entity_type,entity_id,before_data,after_data,notes) VALUES($1,'customer_profile_updated','customer_profile',$2,$3::jsonb,$4::jsonb,'Customer updated their own profile')",[s(user.email||user.id,200),user.id,JSON.stringify(current.rows[0]||{}),JSON.stringify(p.rows[0])]);
  return res.json({profile:p.rows[0]});
 }
