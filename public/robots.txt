@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Sitemap: https://6eggz-poultry-farms.hatchable.site/sitemap.xml
