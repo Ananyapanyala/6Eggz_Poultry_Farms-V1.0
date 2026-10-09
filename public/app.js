@@ -16,10 +16,13 @@
   }
   function renderCartCount() {
     const count = Object.values(cart).reduce((sum, n) => sum + Number(n || 0), 0);
-    $("#cartCount").textContent = String(count);
+    const countEl = $("#cartCount");
+    if (countEl) countEl.textContent = String(count);
   }
   function showToast(message) {
-    const el = $("#toast"); el.textContent = message; el.classList.remove("hidden");
+    const el = $("#toast");
+    if (!el) return;
+    el.textContent = message; el.classList.remove("hidden");
     clearTimeout(showToast.timer); showToast.timer = setTimeout(() => el.classList.add("hidden"), 3600);
   }
   async function jsonFetch(url, options = {}) {
@@ -38,16 +41,19 @@
   function renderProducts() {
     const grid = $("#productGrid"); grid.replaceChildren();
     const filtered = products.filter((p) => {
-      if (currentFilter === "all") return true;
-      if (currentFilter === "Everyday Eggs") return String(p.category).toLowerCase().includes("everyday");
-      return String(p.category).toLowerCase().includes("nutrition") || String(p.category).toLowerCase().includes("enriched");
+      const isEgg = String(p.category).toLowerCase().includes("everyday") || String(p.category).toLowerCase().includes("egg");
+      const isResearch = String(p.category).toLowerCase().includes("nutrition") || String(p.category).toLowerCase().includes("enriched") || String(p.research_status).toLowerCase().includes("research");
+      if (currentFilter === "all") return isEgg && !isResearch;
+      if (currentFilter === "Everyday Eggs") return isEgg && !isResearch;
+      return isResearch;
     });
     if (!filtered.length) {
       const empty = make("div", "empty-catalog");
       empty.append(make("div", "egg", "🥚"));
-      empty.append(make("h3", "", currentFilter === "all" ? "Our product catalogue is being prepared" : "No products in this category yet"));
-      empty.append(make("p", "", currentFilter === "all" ? "Our team is configuring pack sizes, pricing and availability. Send a supply enquiry while we prepare the catalogue." : "Products will appear here when the team has configured their details and status."));
-      const link = make("a", "btn btn-primary btn-small", "Enquire about supply"); link.href = "#bulk"; empty.append(link); grid.append(empty); return;
+      empty.append(make("h3", "", currentFilter === "Nutrition Eggs" ? "Research concepts are not for sale" : "6EGGZ table eggs"));
+      empty.append(make("p", "", currentFilter === "Nutrition Eggs" ? "Growing Years and GlucoBalance are research concepts only. No verified nutrient results or commercial release approval are available yet." : "The core egg product is listed, but confirmed pack size, current price and sellable stock have not been provided. Contact the team for actual supply details."));
+      const link = make("a", "btn btn-primary btn-small", currentFilter === "Nutrition Eggs" ? "View research status" : "Enquire about table eggs");
+      link.href = currentFilter === "Nutrition Eggs" ? "#nutrition" : "#bulk"; empty.append(link); grid.append(empty); return;
     }
     filtered.forEach((p) => {
       const card = make("article", "product-card");
@@ -66,16 +72,16 @@
       if (p.public_nutrition_claim) body.append(make("p", "verified-claim", p.public_nutrition_claim));
       const foot = make("div", "product-foot");
       const priceBox = make("div", "price");
-      priceBox.textContent = p.price_rupees == null ? "Price on request" : money(p.price_rupees);
+      priceBox.textContent = p.price_rupees == null ? "Price on enquiry" : money(p.price_rupees);
       priceBox.append(make("small", "", p.pack_size || "Pack size to be confirmed"));
       foot.append(priceBox);
-      const purchasable = Boolean(!isResearch && p.available && Number(p.stock_quantity) > 0 && p.price_paise != null && p.research_status !== "Discontinued");
-      const add = make("button", "btn btn-primary btn-small", purchasable ? "Add to cart +" : "Enquire");
-      if (purchasable) add.addEventListener("click", () => addToCart(p.id));
-      else add.addEventListener("click", () => {
-        $("#bulkType").value = "bulk";
-        $("#bulkMessage").value = "I'm interested in " + p.name + ". Please share availability and pricing.";
-        $("#bulk").scrollIntoView({ behavior: "smooth" });
+      const add = make("a", "btn btn-primary btn-small", isResearch ? "View research status" : "Request details");
+      add.href = isResearch ? "#nutrition" : "#bulk";
+      if (!isResearch) add.addEventListener("click", () => {
+        const interest = $("#bulkProduct");
+        const message = $("#bulkMessage");
+        if (interest) interest.value = "6EGGZ Table Eggs";
+        if (message) message.value = "I'm interested in " + p.name + ". Please share confirmed availability, pack specification and pricing.";
       });
       foot.append(add); body.append(foot); card.append(body); grid.append(card);
     });
@@ -96,7 +102,9 @@
     return Object.entries(cart).map(([id, quantity]) => ({ p: products.find((x) => x.id === id), quantity: Number(quantity) })).filter((x) => x.p && x.quantity > 0);
   }
   function renderCart() {
-    const lines = $("#cartLines"), summary = $("#cartSummary"); lines.replaceChildren();
+    const lines = $("#cartLines"), summary = $("#cartSummary");
+    if (!lines || !summary) return;
+    lines.replaceChildren();
     const rows = cartRows();
     if (!rows.length) {
       lines.append(make("div", "cart-empty", "Your cart is empty. Add an available item from the catalogue to get started."));
@@ -119,8 +127,18 @@
     });
     $("#cartTotal").textContent = money(total);
   }
-  function openCart() { $("#cartOverlay").classList.add("open"); $("#cartOverlay").setAttribute("aria-hidden", "false"); document.body.style.overflow = "hidden"; $("#closeCart").focus(); }
-  function closeCart() { $("#cartOverlay").classList.remove("open"); $("#cartOverlay").setAttribute("aria-hidden", "true"); document.body.style.overflow = ""; $("#openCart").focus(); }
+  function openCart() {
+    const overlay = $("#cartOverlay");
+    if (!overlay) return;
+    overlay.classList.add("open"); overlay.setAttribute("aria-hidden", "false"); document.body.style.overflow = "hidden";
+    const close = $("#closeCart"); if (close) close.focus();
+  }
+  function closeCart() {
+    const overlay = $("#cartOverlay");
+    if (!overlay) return;
+    overlay.classList.remove("open"); overlay.setAttribute("aria-hidden", "true"); document.body.style.overflow = "";
+    const trigger = $("#openCart"); if (trigger) trigger.focus();
+  }
   function setFeedback(selector, message, kind) { const el = $(selector); el.textContent = message; el.className = "form-message" + (kind ? " " + kind : ""); }
   async function submitEnquiry(form, feedbackSelector) {
     const button = $("button[type=submit]", form);
@@ -163,20 +181,30 @@
     }
   }
 
-  $("#menuToggle").addEventListener("click", () => {
-    const nav = $("#navLinks"), open = nav.classList.toggle("open"); $("#menuToggle").setAttribute("aria-expanded", String(open));
-  });
-  $("#navLinks").querySelectorAll("a").forEach((a) => a.addEventListener("click", () => { $("#navLinks").classList.remove("open"); $("#menuToggle").setAttribute("aria-expanded", "false"); }));
-  $("#openCart").addEventListener("click", openCart); $("#closeCart").addEventListener("click", closeCart);
-  $("#cartOverlay").addEventListener("click", (event) => { if (event.target === $("#cartOverlay")) closeCart(); });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && $("#cartOverlay").classList.contains("open")) closeCart(); });
+  const menuToggle = $("#menuToggle");
+  const navLinks = $("#navLinks");
+  if (menuToggle && navLinks) {
+    menuToggle.addEventListener("click", () => {
+      const open = navLinks.classList.toggle("open"); menuToggle.setAttribute("aria-expanded", String(open));
+    });
+    navLinks.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => { navLinks.classList.remove("open"); menuToggle.setAttribute("aria-expanded", "false"); }));
+  }
+  const openCartButton = $("#openCart"), closeCartButton = $("#closeCart"), cartOverlay = $("#cartOverlay");
+  if (openCartButton) openCartButton.addEventListener("click", openCart);
+  if (closeCartButton) closeCartButton.addEventListener("click", closeCart);
+  if (cartOverlay) cartOverlay.addEventListener("click", (event) => { if (event.target === cartOverlay) closeCart(); });
+  document.addEventListener("keydown", (event) => { const overlay = $("#cartOverlay"); if (event.key === "Escape" && overlay && overlay.classList.contains("open")) closeCart(); });
   document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
     document.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("active", b === button));
     currentFilter = button.dataset.filter; renderProducts();
   }));
-  $("#bulkForm").addEventListener("submit", (event) => { event.preventDefault(); submitEnquiry(event.currentTarget, "#bulkFeedback"); });
-  $("#contactForm").addEventListener("submit", (event) => { event.preventDefault(); submitEnquiry(event.currentTarget, "#contactFeedback"); });
-  $("#orderForm").addEventListener("submit", submitOrder);
-  $("#year").textContent = String(new Date().getFullYear());
+  const bulkForm = $("#bulkForm");
+  if (bulkForm) bulkForm.addEventListener("submit", (event) => { event.preventDefault(); submitEnquiry(event.currentTarget, "#bulkFeedback"); });
+  const contactForm = $("#contactForm");
+  if (contactForm) contactForm.addEventListener("submit", (event) => { event.preventDefault(); submitEnquiry(event.currentTarget, "#contactFeedback"); });
+  const orderForm = $("#orderForm");
+  if (orderForm) orderForm.addEventListener("submit", submitOrder);
+  const year = $("#year");
+  if (year) year.textContent = String(new Date().getFullYear());
   renderCartCount(); renderCart(); loadProducts();
 })();
