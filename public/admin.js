@@ -3,7 +3,7 @@
   const $ = (s, root = document) => root.querySelector(s);
   const API = (window.__HATCHABLE__ && window.__HATCHABLE__.api) || "/api";
   const money = (v) => new Intl.NumberFormat("en-IN", {style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(v||0));
-  let products = [], enquiries = [], orders = [];
+  let products = [], enquiries = [], orders = [], customers = [];
   function node(tag, text, cls) { const e=document.createElement(tag); if(text!==undefined)e.textContent=text; if(cls)e.className=cls; return e; }
   function notice(message) { const e=$("#adminNotice"); e.textContent=message; e.classList.remove("hidden"); }
   function toast(message) { const e=$("#adminToast"); e.textContent=message; e.classList.remove("hidden"); clearTimeout(toast.timer); toast.timer=setTimeout(()=>e.classList.add("hidden"),3200); }
@@ -19,12 +19,12 @@
     headers.forEach(h=>tr.append(node("th",h))); thead.append(tr); t.append(thead);
     const tbody=node("tbody"); rows.forEach(cells=>{const r=node("tr");cells.forEach(c=>{const td=node("td");if(c instanceof Node)td.append(c);else td.textContent=String(c??"—");r.append(td)});tbody.append(r)});t.append(tbody);return t;
   }
-  const sections=["overview","products","enquiries","orders","rnd","labs","batches","farmops","profile"];
+  const sections=["overview","products","enquiries","customers","orders","rnd","labs","batches","farmops","profile"];
   function section(sectionName) {
     sections.forEach(n=>$("#"+n+"Section").classList.toggle("hidden",n!==sectionName));
     document.querySelectorAll("[data-section]").forEach(a=>a.classList.toggle("active",a.dataset.section===sectionName));
-    $("#adminTitle").textContent=({overview:"Overview",products:"Products & evidence",enquiries:"Customer enquiries",orders:"Order requests",rnd:"Nutrition R&D",labs:"Laboratory reports",batches:"Egg batches / QR",farmops:"Farm operations",profile:"DPR profile"})[sectionName]||"Operations";
-    if(sectionName==="products")loadProducts(); if(sectionName==="enquiries")loadEnquiries(); if(sectionName==="orders")loadOrders();
+    $("#adminTitle").textContent=({overview:"Overview",products:"Products & evidence",enquiries:"Customer enquiries",customers:"Customer database",orders:"Order requests",rnd:"Nutrition R&D",labs:"Laboratory reports",batches:"Egg batches / QR",farmops:"Farm operations",profile:"DPR profile"})[sectionName]||"Operations";
+    if(sectionName==="products")loadProducts(); if(sectionName==="enquiries")loadEnquiries(); if(sectionName==="customers")loadCustomers(); if(sectionName==="orders")loadOrders();
     if(sectionName==="rnd")loadRnd(); if(sectionName==="labs")loadLabs(); if(sectionName==="batches")loadBatches(); if(sectionName==="farmops")loadFarmOps(); if(sectionName==="profile")loadProfile();
   }
   function renderProductTable() {
@@ -73,6 +73,36 @@
     target.append(table(["Type","Contact & message","Product","Quantity","Location","Received","Follow-up"],rows));
   }
   async function loadEnquiries(){try{const d=await api("/admin/enquiries");enquiries=d.enquiries||[];renderEnquiries()}catch(e){notice(e.message)}}
+  function visibleCustomers(){
+    const term=($("#customerSearch")?.value||"").trim().toLowerCase();
+    const filter=$("#customerFilter")?.value||"all";
+    return customers.filter(c=>{
+      const hay=[c.name,c.email,c.phone,c.organisation,(c.sources||[]).join(" "),(c.interests||[]).join(" ")].join(" ").toLowerCase();
+      return (!term||hay.includes(term))&&(filter==="all"||(filter==="opted_in"?c.marketing_opt_in:!c.marketing_opt_in));
+    });
+  }
+  function renderCustomers(){
+    const target=$("#customersTable");if(!target)return;target.replaceChildren();
+    const rows=visibleCustomers();
+    $("#customerSummary").textContent=customers.length+" unique email contacts · "+customers.filter(c=>c.marketing_opt_in).length+" opted in to marketing · "+rows.length+" shown";
+    if(!rows.length){target.append(node("p","No customers match these filters."));return;}
+    const data=rows.map(c=>[
+      c.name||"—",c.email,c.phone||"—",c.organisation||"—",
+      (c.sources||[]).join(", "),(c.interests||[]).join(", ")||"—",fmtDate(c.last_contact_at),
+      c.marketing_opt_in?("Opted in"+(c.consent_at?" · "+fmtDate(c.consent_at):"")):("Not opted in"+(c.opted_out_at?" · opted out "+fmtDate(c.opted_out_at):""))
+    ]);
+    target.append(table(["Name","Email","Phone","Organisation","Sources","Product interests","Last contact","Marketing consent"],data));
+  }
+  async function loadCustomers(){try{const d=await api("/admin/customers");customers=d.customers||[];renderCustomers()}catch(e){notice(e.message)}}
+  function csvCell(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
+  function exportCustomers(optedOnly){
+    const rows=optedOnly?customers.filter(c=>c.marketing_opt_in):customers;
+    if(!rows.length){notice(optedOnly?"No opted-in email contacts to export.":"No customer contacts to export.");return;}
+    const header=["name","email","phone","organisation","sources","interests","last_contact_at","marketing_opt_in","consent_at","opted_out_at","consent_source"];
+    const lines=[header,...rows.map(c=>[c.name,c.email,c.phone,c.organisation,(c.sources||[]).join("; "),(c.interests||[]).join("; "),c.last_contact_at,c.marketing_opt_in,c.consent_at,c.opted_out_at,c.consent_source])].map(r=>r.map(csvCell).join(","));
+    const blob=new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob),a=node("a","");a.href=url;a.download=optedOnly?"6eggz-marketing-opt-in.csv":"6eggz-customer-contacts.csv";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);toast("CSV export prepared");
+  }
   async function loadRnd(){
     try{
       const [d,costData]=await Promise.all([api("/admin/rnd"),api("/admin/rnd-costs")]);
@@ -271,6 +301,8 @@
     } catch(e) { notice(e.message); }
   }
   document.querySelectorAll("[data-section]").forEach(a=>a.addEventListener("click",event=>{event.preventDefault();section(a.dataset.section)}));
+  $("#customerSearch").addEventListener("input",renderCustomers);$("#customerFilter").addEventListener("change",renderCustomers);
+  $("#exportCustomers").addEventListener("click",()=>exportCustomers(false));$("#exportOptedIn").addEventListener("click",()=>exportCustomers(true));
   $("#productForm").addEventListener("submit",saveProduct);$("#resetProduct").addEventListener("click",resetProduct);
   $("#gateForm").addEventListener("submit",saveGate);$("#rndStatusForm").addEventListener("submit",saveRndStatus);
   $("#measurementForm").addEventListener("submit",saveMeasurement);$("#costForm").addEventListener("submit",saveCost);

@@ -23,5 +23,9 @@ export default async function (req, res) {
     "INSERT INTO enquiries (enquiry_type, name, email, phone, organisation, product_interest, quantity, delivery_location, frequency, message) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, created_at",
     [type, name, email, phone, clean(b.organisation, 200), clean(b.product_interest, 160), clean(b.quantity, 120), clean(b.delivery_location, 240), clean(b.frequency, 120), message]
   );
+  const marketingOptIn = b.marketing_opt_in === true || b.marketing_opt_in === "true" || b.marketing_opt_in === "on";
+  if (marketingOptIn && email) {
+    await db.query("INSERT INTO customer_marketing_preferences(email,marketing_opt_in,consent_at,opted_out_at,consent_source,updated_at) VALUES($1,TRUE,NOW(),NULL,$2,NOW()) ON CONFLICT(email) DO UPDATE SET marketing_opt_in=TRUE,consent_at=NOW(),opted_out_at=NULL,consent_source=EXCLUDED.consent_source,updated_at=NOW()", [email.toLowerCase(), "website enquiry form"]);
+  }
   return res.status(201).json({ ok: true, enquiry_id: rows[0].id, message: "Thanks. Your enquiry has been recorded; our team can follow up using the contact details provided." });
 }
