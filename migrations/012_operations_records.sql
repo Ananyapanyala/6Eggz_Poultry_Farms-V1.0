@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS farm_daily_records (
+  id BIGSERIAL PRIMARY KEY,
+  record_date DATE NOT NULL,
+  house_code TEXT NOT NULL DEFAULT '',
+  flock_count INTEGER,
+  eggs_produced INTEGER,
+  saleable_eggs INTEGER,
+  rejected_eggs INTEGER,
+  feed_used_kg NUMERIC,
+  feed_cost_paise BIGINT,
+  medicine_cost_paise BIGINT,
+  labour_energy_cost_paise BIGINT,
+  notes TEXT NOT NULL DEFAULT '',
+  entered_by TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK(flock_count IS NULL OR flock_count >= 0),
+  CHECK(eggs_produced IS NULL OR eggs_produced >= 0),
+  CHECK(saleable_eggs IS NULL OR saleable_eggs >= 0),
+  CHECK(rejected_eggs IS NULL OR rejected_eggs >= 0)
+)

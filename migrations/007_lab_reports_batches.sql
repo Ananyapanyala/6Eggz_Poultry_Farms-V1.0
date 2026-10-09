@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS lab_reports (
+  id BIGSERIAL PRIMARY KEY,
+  project_id BIGINT REFERENCES rnd_projects(id) ON DELETE SET NULL,
+  batch_id BIGINT,
+  sample_id TEXT NOT NULL,
+  test_parameter TEXT NOT NULL,
+  result_value NUMERIC,
+  result_text TEXT NOT NULL DEFAULT '',
+  result_unit TEXT NOT NULL DEFAULT '',
+  test_method TEXT NOT NULL DEFAULT '',
+  test_date DATE,
+  laboratory_name TEXT NOT NULL,
+  accreditation_status TEXT NOT NULL DEFAULT 'Not Reviewed',
+  accreditation_scope_notes TEXT NOT NULL DEFAULT '',
+  report_storage_key TEXT NOT NULL DEFAULT '',
+  report_reference TEXT NOT NULL DEFAULT '',
+  reviewer TEXT NOT NULL DEFAULT '',
+  review_status TEXT NOT NULL DEFAULT 'Pending Review',
+  decision_notes TEXT NOT NULL DEFAULT '',
+  is_public_summary_approved BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
