@@ -96,7 +96,6 @@ export default async function (req, res) {
  const gate=document.getElementById("adminAuthGate"),workspace=document.getElementById("adminWorkspace"),link=document.getElementById("adminLoginLink"),message=document.getElementById("adminAuthMessage");
  const consoleUrl="https://hatchable.com/console/projects/6eggz-poultry-farms";
  gate.style.display="block";workspace.style.display="none";link.href=consoleUrl;
- const A=window.hatchable&&window.hatchable.auth;let session=null;try{session=A&&await A.getSession()}catch(_){}
  try{const r=await fetch("/api/admin/overview");if(r.status===401||r.status===403){message.textContent="Administrator permission is required. Sign in with the Hatchable account that owns this project or ask the owner to grant admin collaborator access.";return}if(!r.ok){message.textContent="Administrator access could not be verified. Refresh and try again.";return}gate.style.display="none";workspace.style.display="block";const script=document.createElement("script");script.src="/admin.js";document.body.appendChild(script)}catch(_){message.textContent="Unable to verify access. Check your connection and refresh."}
 })();
 </script></body></html>`);

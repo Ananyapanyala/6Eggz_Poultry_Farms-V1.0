@@ -5,7 +5,7 @@ const norm = v => typeof v === "string" ? v.trim().toLowerCase() : "";
 export default async function(req,res){
  const [enq,accounts,prefs]=await Promise.all([
   db.query("SELECT name,email,phone,organisation,enquiry_type,product_interest,status,created_at FROM enquiries ORDER BY created_at DESC LIMIT 2000"),
-  db.query("SELECT u.email,u.name,COALESCE(cp.full_name,'') AS full_name,COALESCE(cp.phone,'') AS phone,u.created_at FROM users u LEFT JOIN customer_profiles cp ON cp.user_id=u.id ORDER BY u.created_at DESC LIMIT 2000"),
+  db.query("SELECT u.email,u.name,COALESCE(cp.full_name,'') AS full_name,COALESCE(cp.phone,'') AS phone,u.created_at FROM users u LEFT JOIN customer_profiles cp ON cp.user_id=u.hatchable_user_id ORDER BY u.created_at DESC LIMIT 2000"),
   db.query("SELECT email,marketing_opt_in,consent_at,opted_out_at,consent_source,updated_at FROM customer_marketing_preferences")
  ]);
  const byEmail=new Map();
