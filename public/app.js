@@ -55,8 +55,9 @@
       if (p.image_url) {
         const image = make("img"); image.src = p.image_url; image.alt = p.name; image.loading = "lazy"; image.onerror = () => { imageWrap.replaceChildren(make("div", "product-placeholder", "🥚")); }; imageWrap.append(image);
       } else imageWrap.append(make("div", "product-placeholder", "🥚"));
-      const badgeText = p.research_status === "Verified" && p.evidence_approved ? "Evidence reviewed" :
-        (p.category.toLowerCase().includes("nutrition") || p.research_status === "Under Testing" ? "Research-stage" : (p.available && p.stock_quantity > 0 ? "Available" : "Availability to confirm"));
+      const isResearch = String(p.id).startsWith("rnd-") || p.category.toLowerCase().includes("nutrition") || String(p.research_status).toLowerCase().includes("research");
+      const badgeText = isResearch ? "Research concept · Not for sale" :
+        (p.research_status === "Verified" && p.evidence_approved ? "Evidence reviewed" : (p.available && p.stock_quantity > 0 ? "Available" : "Enquire for availability"));
       imageWrap.append(make("span", "product-badge", badgeText));
       card.append(imageWrap);
       const body = make("div", "product-content");
@@ -68,7 +69,7 @@
       priceBox.textContent = p.price_rupees == null ? "Price on request" : money(p.price_rupees);
       priceBox.append(make("small", "", p.pack_size || "Pack size to be confirmed"));
       foot.append(priceBox);
-      const purchasable = Boolean(p.available && Number(p.stock_quantity) > 0 && p.price_paise != null && p.research_status !== "Discontinued");
+      const purchasable = Boolean(!isResearch && p.available && Number(p.stock_quantity) > 0 && p.price_paise != null && p.research_status !== "Discontinued");
       const add = make("button", "btn btn-primary btn-small", purchasable ? "Add to cart +" : "Enquire");
       if (purchasable) add.addEventListener("click", () => addToCart(p.id));
       else add.addEventListener("click", () => {
