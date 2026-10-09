@@ -5,6 +5,8 @@
   const money = (n) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(n || 0));
   let products = [];
   let currentFilter = "all";
+  let searchQuery = "";
+  let maxPrice = "";
   let cart = readCart();
 
   function readCart() {
@@ -41,12 +43,17 @@
   function renderProducts() {
     const grid = $("#productGrid"); grid.replaceChildren();
     const filtered = products.filter((p) => {
-      const isEgg = String(p.category).toLowerCase().includes("everyday") || String(p.category).toLowerCase().includes("egg");
-      const isResearch = String(p.category).toLowerCase().includes("nutrition") || String(p.category).toLowerCase().includes("enriched") || String(p.research_status).toLowerCase().includes("research");
-      if (currentFilter === "all") return isEgg && !isResearch;
-      if (currentFilter === "Everyday Eggs") return isEgg && !isResearch;
-      return isResearch;
+      const category = String(p.category || "").toLowerCase();
+      const status = String(p.research_status || "").toLowerCase();
+      const isEgg = category.includes("everyday") || category.includes("egg");
+      const isResearch = category.includes("nutrition") || category.includes("enriched") || category.includes("research") || status.includes("research");
+      const matchesCategory = currentFilter === "Nutrition Eggs" ? isResearch : isEgg && !isResearch;
+      const matchesSearch = !searchQuery || [p.name,p.description,p.category,p.pack_size].some(v => String(v || "").toLowerCase().includes(searchQuery));
+      const matchesPrice = !maxPrice || (p.price_rupees != null && Number(p.price_rupees) <= Number(maxPrice));
+      return matchesCategory && matchesSearch && matchesPrice;
     });
+    const count = $("#catalogCount");
+    if (count) count.textContent = filtered.length + (filtered.length === 1 ? " result" : " results");
     if (!filtered.length) {
       const empty = make("div", "empty-catalog");
       empty.append(make("div", "egg", "🥚"));
@@ -198,6 +205,10 @@
     document.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("active", b === button));
     currentFilter = button.dataset.filter; renderProducts();
   }));
+  const searchInput = $("#productSearch");
+  if (searchInput) searchInput.addEventListener("input", () => { searchQuery = searchInput.value.trim().toLowerCase(); renderProducts(); });
+  const priceInput = $("#priceFilter");
+  if (priceInput) priceInput.addEventListener("change", () => { maxPrice = priceInput.value; renderProducts(); });
   const bulkForm = $("#bulkForm");
   if (bulkForm) bulkForm.addEventListener("submit", (event) => { event.preventDefault(); submitEnquiry(event.currentTarget, "#bulkFeedback"); });
   const contactForm = $("#contactForm");

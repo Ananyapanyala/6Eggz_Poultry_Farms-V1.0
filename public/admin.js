@@ -66,7 +66,7 @@
       const control=node("div");const status=node("select");["new","contacted","quoted","converted","closed","spam"].forEach(s=>{const o=node("option",s);o.value=s;o.selected=q.status===s;status.append(o)});status.setAttribute("aria-label","Enquiry status");
       const quote=node("input");quote.type="number";quote.min="0";quote.step=".01";quote.placeholder="Quote ₹";quote.value=q.quote_paise==null?"":String(Number(q.quote_paise)/100);quote.style.width="100px";quote.style.margin="6px 0";
       const notes=node("textarea");notes.placeholder="Internal notes";notes.value=q.admin_notes||"";notes.rows=2;notes.style.width="160px";notes.style.display="block";
-      const save=node("button","Save","btn btn-primary btn-small");save.style.marginTop="7px";save.addEventListener("click",async()=>{save.disabled=true;try{await api("/admin/enquiries",{method:"POST",body:JSON.stringify({id:q.id,status:status.value,quote_rupees:quote.value===""?null:Number(quote.value),admin_notes:notes.value})});toast("Enquiry updated");await loadEnquiries()}catch(e){notice(e.message);save.disabled=false}});
+      const save=node("button","Save","btn btn-primary btn-small");save.style.marginTop="7px";save.addEventListener("click",async()=>{save.disabled=true;try{await api("/admin/enquiries",{method:"POST",body:JSON.stringify({action:"review",id:q.id,status:status.value,quote_rupees:quote.value===""?null:Number(quote.value),admin_notes:notes.value})});toast("Enquiry updated");await loadEnquiries()}catch(e){notice(e.message);save.disabled=false}});
       control.append(status,quote,notes,save);
       return [q.enquiry_type,detail,q.product_interest||"—",q.quantity||"—",q.delivery_location||"—",fmtDate(q.created_at),control];
     });
@@ -257,9 +257,17 @@
   async function loadOrders(){try{const d=await api("/admin/orders");orders=d.orders||[];renderOrders()}catch(e){notice(e.message)}}
   async function loadOverview() {
     try { const d=await api("/admin/overview");const p=d.products||{},q=d.enquiries||{};
-      $("#metricProducts").textContent=p.total??0;$("#metricStock").textContent=(p.available??0)+" · "+(p.low_stock??0);$("#metricEnquiries").textContent=q.new_count??0;$("#metricRevenue").textContent=money(d.paid_revenue_rupees||0);
+      $("#metricProducts").textContent=p.total??0;
+      $("#metricStock").textContent=(p.available??0)+" saleable · "+(p.low_stock??0)+" low-stock";
+      $("#metricEnquiries").textContent=q.new_count??0;
+      $("#metricRevenue").textContent=money(d.paid_revenue_rupees||0);
       $("#adminNotice").classList.add("hidden");
-      try { const op=await api("/operations-metrics"); $("#metricProducts").textContent=op.inventory?.products??0; $("#metricStock").textContent=(op.inventory?.saleable_skus??0)+" saleable · "+String((op.inventory?.packs_on_hand??0))+" packs"; } catch (_) {}
+      try {
+      const op=await api("/operations-metrics");
+      $("#metricProducts").textContent=op.inventory?.products??0;
+      $("#metricStock").textContent=(op.inventory?.saleable_skus??0)+" saleable · "+String(op.inventory?.packs_on_hand??0)+" packs";
+      if(op.farm?.data_status==="No data available") notice("No farm production records have been entered yet. Production figures are intentionally shown as unavailable rather than copied from DPR projections.");
+    } catch (_) {}
     } catch(e) { notice(e.message); }
   }
   document.querySelectorAll("[data-section]").forEach(a=>a.addEventListener("click",event=>{event.preventDefault();section(a.dataset.section)}));
