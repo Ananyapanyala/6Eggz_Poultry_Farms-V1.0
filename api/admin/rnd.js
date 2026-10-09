@@ -1,7 +1,7 @@
 import { db } from "hatchable";
 
 export const access = "admin";
-export const methods = ["GET", "POST", "PATCH"];
+export const methods = ["GET", "POST", "PUT"];
 
 const STATUSES = ["Proposed","Under Review","Baseline Testing","Trial Planned","Trial Active","Laboratory Testing","Confirmation Required","Regulatory Review","Approved for Commercial Release","On Hold","Rejected","Discontinued"];
 const GATE_STATUSES = ["Not Started","In Progress","Pass","Fail","Needs More Evidence","Waived"];

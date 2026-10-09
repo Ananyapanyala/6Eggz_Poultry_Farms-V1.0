@@ -66,7 +66,7 @@
       const control=node("div");const status=node("select");["new","contacted","quoted","converted","closed","spam"].forEach(s=>{const o=node("option",s);o.value=s;o.selected=q.status===s;status.append(o)});status.setAttribute("aria-label","Enquiry status");
       const quote=node("input");quote.type="number";quote.min="0";quote.step=".01";quote.placeholder="Quote ₹";quote.value=q.quote_paise==null?"":String(Number(q.quote_paise)/100);quote.style.width="100px";quote.style.margin="6px 0";
       const notes=node("textarea");notes.placeholder="Internal notes";notes.value=q.admin_notes||"";notes.rows=2;notes.style.width="160px";notes.style.display="block";
-      const save=node("button","Save","btn btn-primary btn-small");save.style.marginTop="7px";save.addEventListener("click",async()=>{save.disabled=true;try{await api("/admin/enquiries",{method:"PATCH",body:JSON.stringify({id:q.id,status:status.value,quote_rupees:quote.value===""?null:Number(quote.value),admin_notes:notes.value})});toast("Enquiry updated");await loadEnquiries()}catch(e){notice(e.message);save.disabled=false}});
+      const save=node("button","Save","btn btn-primary btn-small");save.style.marginTop="7px";save.addEventListener("click",async()=>{save.disabled=true;try{await api("/admin/enquiries",{method:"POST",body:JSON.stringify({id:q.id,status:status.value,quote_rupees:quote.value===""?null:Number(quote.value),admin_notes:notes.value})});toast("Enquiry updated");await loadEnquiries()}catch(e){notice(e.message);save.disabled=false}});
       control.append(status,quote,notes,save);
       return [q.enquiry_type,detail,q.product_interest||"—",q.quantity||"—",q.delivery_location||"—",fmtDate(q.created_at),control];
     });
@@ -114,7 +114,7 @@
   }
   async function saveRndStatus(event){
     event.preventDefault();const f=event.currentTarget,b=Object.fromEntries(new FormData(f).entries());b.id=Number(b.id);
-    try{await api("/admin/rnd",{method:"PATCH",body:JSON.stringify(b)});$("#rndStatusFeedback").textContent="Research project status saved.";$("#rndStatusFeedback").className="form-message success";toast("Research project updated");await loadRnd()}
+    try{await api("/admin/rnd",{method:"PUT",body:JSON.stringify(b)});$("#rndStatusFeedback").textContent="Research project status saved.";$("#rndStatusFeedback").className="form-message success";toast("Research project updated");await loadRnd()}
     catch(e){$("#rndStatusFeedback").textContent=e.message;$("#rndStatusFeedback").className="form-message error"}
   }
   async function saveMeasurement(event){
@@ -152,7 +152,7 @@
   }
   async function reviewLab(event){
     event.preventDefault();const f=event.currentTarget,b=Object.fromEntries(new FormData(f).entries());b.id=Number(b.id);b.is_public_summary_approved=f.elements.is_public_summary_approved.checked;
-    try{await api("/admin/lab-reports",{method:"PATCH",body:JSON.stringify(b)});$("#labReviewFeedback").textContent="Lab review saved. This is not automatic regulatory or product approval.";$("#labReviewFeedback").className="form-message success";toast("Lab review saved");await loadLabs()}
+    try{await api("/admin/lab-reports",{method:"POST",body:JSON.stringify({action:"review",...b})});$("#labReviewFeedback").textContent="Lab review saved. This is not automatic regulatory or product approval.";$("#labReviewFeedback").className="form-message success";toast("Lab review saved");await loadLabs()}
     catch(e){$("#labReviewFeedback").textContent=e.message;$("#labReviewFeedback").className="form-message error"}
   }
   async function loadBatches(){
@@ -177,7 +177,7 @@
   }
   async function saveBatchReview(event){
     event.preventDefault();const f=event.currentTarget,b=Object.fromEntries(new FormData(f).entries());b.id=Number(b.id);
-    try{await api("/admin/batches",{method:"PATCH",body:JSON.stringify(b)});$("#batchReviewFeedback").textContent="Batch status saved.";$("#batchReviewFeedback").className="form-message success";toast("Batch status saved");await loadBatches()}
+    try{await api("/admin/batches",{method:"POST",body:JSON.stringify({action:"review",...b})});$("#batchReviewFeedback").textContent="Batch status saved.";$("#batchReviewFeedback").className="form-message success";toast("Batch status saved");await loadBatches()}
     catch(e){$("#batchReviewFeedback").textContent=e.message;$("#batchReviewFeedback").className="form-message error"}
   }
   async function loadFarmOps(){
@@ -248,7 +248,7 @@
       const control=node("div");const st=node("select");[["pending_confirmation","Pending confirmation"],["confirmed","Confirmed"],["packing","Packing"],["out_for_delivery","Out for delivery"],["delivered","Delivered"],["cancelled","Cancelled"]].forEach(([v,l])=>{const op=node("option",l);op.value=v;op.selected=o.order_status===v;st.append(op)});
       const pay=node("select");[["not_configured","Payment not configured"],["awaiting_payment","Awaiting payment"],["paid","Paid (verified)"],["failed","Failed"],["refunded","Refunded"]].forEach(([v,l])=>{const op=node("option",l);op.value=v;op.selected=o.payment_status===v;pay.append(op)});
       st.style.display="block";st.style.marginBottom="7px";pay.style.display="block";pay.style.marginBottom="7px";st.setAttribute("aria-label","Order status");pay.setAttribute("aria-label","Payment status");
-      const save=node("button","Save status","btn btn-primary btn-small");save.addEventListener("click",async()=>{save.disabled=true;try{await api("/admin/orders",{method:"PATCH",body:JSON.stringify({id:o.id,order_status:st.value,payment_status:pay.value})});toast("Order updated");await loadOrders();await loadOverview()}catch(e){notice(e.message);save.disabled=false}});
+      const save=node("button","Save status","btn btn-primary btn-small");save.addEventListener("click",async()=>{save.disabled=true;try{await api("/admin/orders",{method:"POST",body:JSON.stringify({id:o.id,order_status:st.value,payment_status:pay.value})});toast("Order updated");await loadOrders();await loadOverview()}catch(e){notice(e.message);save.disabled=false}});
       control.append(st,pay,save);
       return [String(o.id).slice(0,8),fmtDate(o.created_at),detail,itemDetail,money(Number(o.total_paise)/100),o.payment_status,o.order_status,control];
     });

@@ -2,7 +2,7 @@ import { db, storage } from "hatchable";
 import crypto from "node:crypto";
 
 export const access = "admin";
-export const methods = ["GET", "POST", "PATCH"];
+export const methods = ["GET", "POST"];
 
 const s = (v,n=500) => typeof v==="string" ? v.trim().slice(0,n) : "";
 const types = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
@@ -14,7 +14,19 @@ export default async function (req,res) {
     return res.json({reports:r.rows});
   }
   const b=req.body||{};
-  if(req.method==="POST"){
+  if(req.method==="POST" && b.action === "review"){
+    const id=Number(b.id), status=s(b.review_status,50);
+    const allowed=["Pending Review","Reviewed","Accepted for Internal Use","Rejected","Inconclusive"];
+    if(!Number.isInteger(id)||!allowed.includes(status)||!s(b.reviewer,200)||!s(b.decision_notes,200)) return res.status(400).json({error:"Provide report ID, valid review status, reviewer and decision notes."});
+    const prior=await db.query("SELECT * FROM lab_reports WHERE id=$1",[id]);
+    if(!prior.rows.length)return res.status(404).json({error:"Lab report not found."});
+    const approval=status==="Accepted for Internal Use"&&b.is_public_summary_approved===true;
+    const r=await db.query("UPDATE lab_reports SET accreditation_status=$2,accreditation_scope_notes=$3,reviewer=$4,review_status=$5,decision_notes=$6,is_public_summary_approved=$7,updated_at=NOW() WHERE id=$1 RETURNING id,project_id,sample_id,test_parameter,laboratory_name,accreditation_status,reviewer,review_status,decision_notes,is_public_summary_approved",
+    [id,s(b.accreditation_status,80),s(b.accreditation_scope_notes,2000),s(b.reviewer,200),status,s(b.decision_notes,3000),approval]);
+    await db.query("INSERT INTO admin_audit_log (actor,action,entity_type,entity_id,before_data,after_data,notes) VALUES ($1,'lab_report_reviewed','lab_report',$2,$3::jsonb,$4::jsonb,'Review is an internal record, not automatic regulatory approval.')",[req.member?.email||req.member?.handle||"project-admin",String(id),JSON.stringify(prior.rows[0]),JSON.stringify(r.rows[0])]);
+    return res.json({report:r.rows[0]});
+  }
+  if(req.method==="POST" && !b.action){
     const sample=s(b.sample_id,120), parameter=s(b.test_parameter,200), lab=s(b.laboratory_name,240);
     if(!sample||!parameter||!lab) return res.status(400).json({error:"Sample ID, test parameter and laboratory name are required."});
     let key="";

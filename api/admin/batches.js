@@ -2,7 +2,7 @@ import { db } from "hatchable";
 import crypto from "node:crypto";
 
 export const access="admin";
-export const methods=["GET","POST","PATCH"];
+export const methods=["GET","POST"];
 
 const s=(v,n=1000)=>typeof v==="string"?v.trim().slice(0,n):"";
 const RELEASE=["Quarantined","Pending QC","Released","On Hold","Recalled","Withdrawn"];
@@ -13,7 +13,32 @@ export default async function(req,res){
     return res.json({batches:r.rows});
   }
   const b=req.body||{};
-  if(req.method==="POST"){
+  if(req.method==="POST" && b.action === "review"){
+    const id=Number(b.id),status=s(b.release_status,40),recall=s(b.recall_status,40),qc=s(b.quality_inspection_status,60);
+    if(!Number.isInteger(id)||!RELEASE.includes(status)||!["Clear","Hold","Recalled","Withdrawn"].includes(recall))return res.status(400).json({error:"Provide valid batch ID, release status and recall status."});
+    const prior=await db.query("SELECT * FROM egg_batches WHERE id=$1",[id]);
+    if(!prior.rows.length)return res.status(404).json({error:"Batch not found."});
+    if(status==="Released"&&recall!=="Clear")return res.status(409).json({error:"A held, recalled or withdrawn batch cannot be released."});
+    if(status==="Released"){
+      if(qc!=="Passed"||!b.release_decision||!s(b.released_by,200))return res.status(400).json({error:"Release requires passed QC, a written release decision and a named reviewer."});
+      if(prior.rows[0].rnd_project_id){
+        const project=await db.query("SELECT commercial_release_approved FROM rnd_projects WHERE id=$1",[prior.rows[0].rnd_project_id]);
+        if(!project.rows[0]||!project.rows[0].commercial_release_approved)return res.status(409).json({error:"The linked specialised research project has not been approved for commercial release."});
+      }
+      const reports=await db.query("SELECT COUNT(*)::int AS n FROM lab_reports WHERE batch_id=$1 AND review_status='Accepted for Internal Use'",[id]);
+      if(Number(reports.rows[0].n)===0)return res.status(409).json({error:"No accepted laboratory report is linked to this batch. A reviewer must assess real test evidence before release."});
+    }
+    const finalStatus=(recall!=="Clear"&&status==="Released")?"Recalled":status;
+    const updated=await db.query("UPDATE egg_batches SET quality_inspection_status=$2,release_status=$3,recall_status=$4,storage_guidance=$5,public_summary=$6,released_by=CASE WHEN $3='Released' THEN $7 ELSE released_by END,released_at=CASE WHEN $3='Released' THEN NOW() ELSE released_at END,updated_at=NOW() WHERE id=$1 RETURNING *",
+    [id,qc,finalStatus,recall,s(b.storage_guidance,1000)||prior.rows[0].storage_guidance,s(b.public_summary,1500),s(b.released_by,200)]);
+    await db.query("INSERT INTO admin_audit_log (actor,action,entity_type,entity_id,before_data,after_data,notes) VALUES ($1,'egg_batch_status_change','egg_batch',$2,$3::jsonb,$4::jsonb,$5)",[req.member?.email||req.member?.handle||"project-admin",String(id),JSON.stringify(prior.rows[0]),JSON.stringify(updated.rows[0]),s(b.release_decision,2000)]);
+    if(["On Hold","Recalled","Withdrawn"].includes(finalStatus)||recall!=="Clear"){
+      const linked=prior.rows[0].product_id;
+      if(linked) await db.query("UPDATE products SET available=FALSE,updated_at=NOW() WHERE id=$1",[linked]);
+    }
+    return res.json({batch:updated.rows[0]});
+  }
+  if(req.method==="POST" && !b.action){
     const code=s(b.batch_code,100);
     const produced=Number(b.quantity_produced),saleable=Number(b.saleable_quantity),rejected=Number(b.rejected_quantity);
     if(!code||!Number.isInteger(produced)||!Number.isInteger(saleable)||!Number.isInteger(rejected)||produced<0||saleable<0||rejected<0||saleable+rejected>produced) return res.status(400).json({error:"Enter a unique batch code and valid produced/saleable/rejected egg counts."});
